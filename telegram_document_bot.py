@@ -131,7 +131,7 @@ async def ask_taeg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         if dt in ('/contratto',):
             buf = build_contratto(d)
-            filename = f"Contrato_{d['name']}.pdf"
+            filename = f"Contratto_{d['name']}.pdf"
         else:
             buf = build_lettera_carta(d)
             filename = f"Carta_{d['name']}.pdf"
