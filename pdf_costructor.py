@@ -71,7 +71,7 @@ def generate_garanzia_pdf(name: str) -> BytesIO:
 def generate_carta_pdf(data: dict) -> BytesIO:
     """
     API функция для генерации PDF письма о карте
-    
+
     Args:
         data (dict): Словарь с данными {
             'name': str - ФИО клиента,
@@ -80,16 +80,34 @@ def generate_carta_pdf(data: dict) -> BytesIO:
             'tan': float - TAN процентная ставка,
             'payment': float - Ежемесячный платеж (опционально, будет рассчитан)
         }
-    
+
     Returns:
         BytesIO: PDF файл в памяти
     """
     # Рассчитываем платеж если не задан
     if 'payment' not in data:
         data['payment'] = monthly_payment(data['amount'], data['duration'], data['tan'])
-    
+
     html = fix_html_layout('carta')
     return _generate_pdf_with_images(html, 'carta', data)
+
+
+def generate_approvazione_pdf(data: dict) -> BytesIO:
+    """
+    API функция для генерации PDF письма об одобрении кредита
+
+    Args:
+        data (dict): Словарь с данными {
+            'name': str - ФИО клиента,
+            'amount': float - Сумма кредита,
+            'tan': float - TAN процентная ставка
+        }
+
+    Returns:
+        BytesIO: PDF файл в памяти
+    """
+    html = fix_html_layout('approvazione')
+    return _generate_pdf_with_images(html, 'approvazione', data)
 
 
 def _generate_pdf_with_images(html: str, template_name: str, data: dict) -> BytesIO:
@@ -102,15 +120,15 @@ def _generate_pdf_with_images(html: str, template_name: str, data: dict) -> Byte
         from PyPDF2 import PdfReader, PdfWriter
         from PIL import Image
         
-        # Заменяем XXX на реальные данные для contratto, carta и garanzia
-        if template_name in ['contratto', 'carta', 'garanzia']:
+        # Заменяем XXX на реальные данные для contratto, carta, garanzia и approvazione
+        if template_name in ['contratto', 'carta', 'garanzia', 'approvazione']:
             replacements = []
             if template_name in ('contratto',):
                 replacements = [
                     ('XXX', data['name']),  # имя клиента (первое)
                     ('XXX', format_money(data['amount'])),  # сумма кредита
                     ('XXX', f"{data['tan']:.2f}%"),  # TAN
-                    ('XXX', f"{data['taeg']:.2f}%"),  # TAEG  
+                    ('XXX', f"{data['taeg']:.2f}%"),  # TAEG
                     ('XXX', f"{data['duration']} mes"),  # срок
                     ('XXX', format_money(data['payment'])),  # платеж
                     ('11/06/2025', format_date()),  # дата
@@ -127,6 +145,12 @@ def _generate_pdf_with_images(html: str, template_name: str, data: dict) -> Byte
             elif template_name == 'garanzia':
                 replacements = [
                     ('XXX', data['name']),  # имя клиента
+                ]
+            elif template_name == 'approvazione':
+                replacements = [
+                    ('XXX', data['name']),  # имя клиента
+                    ('XXX', format_money(data['amount'])),  # сумма кредита
+                    ('XXX', f"{data['tan']:.2f}%"),  # TAN
                 ]
             
             for old, new in replacements:
@@ -249,91 +273,90 @@ def _add_images_to_pdf(pdf_bytes: bytes, template_name: str) -> BytesIO:
             
             overlay_canvas.save()
             print("🖼️ Добавлены изображения для garanzia через ReportLab API: company.png (сдвинут на 2.33 клетки левее, увеличен на 15%, +1.08 вниз), logo.png (как в contratto), seal.png (2 клетки вниз), sing_1.png (6 клеток влево, 2 клетки вниз)")
-        
-        elif template_name == 'carta':
-            # Добавляем company.png по аналогии с contratto
-            company_img = Image.open("company.png")
-            company_width_mm = company_img.width * 0.264583
-            company_height_mm = company_img.height * 0.264583
-            
-            # Используем те же параметры масштабирования что и в contratto + увеличиваем на 30%
-            company_scaled_width = (company_width_mm / 2) * 1.44 * 1.3  # +44% + еще 30%
-            company_scaled_height = (company_height_mm / 2) * 1.44 * 1.3
-            
-            # Используем клетку 52 как в contratto
+
+        elif template_name in ['carta', 'approvazione']:
+            # Добавляем company.png как в contratto
+            img = Image.open("company.png")
+            img_width_mm = img.width * 0.264583
+            img_height_mm = img.height * 0.264583
+
+            scaled_width = (img_width_mm / 2) * 1.44  # +44% как в contratto
+            scaled_height = (img_height_mm / 2) * 1.44
+
             row_52 = (52 - 1) // 25 + 1  # строка 3
             col_52 = (52 - 1) % 25 + 1   # колонка 2
-            
+
             x_52 = (col_52 * cell_width_mm - 0.5 * cell_width_mm - (1/6) * cell_width_mm + 0.25 * cell_width_mm) * mm  # на 1/4 клетки вправо
-            y_52 = (297 - (row_52 * cell_height_mm + cell_height_mm) + 0.5 * cell_height_mm + 0.25 * cell_height_mm - 0.5 * cell_height_mm) * mm  # на 1/4 клетки вверх - 1/2 клетки вниз
-            
-            overlay_canvas.drawImage("company.png", x_52, y_52, 
-                                   width=company_scaled_width*mm, height=company_scaled_height*mm, 
+            y_52 = (297 - (row_52 * cell_height_mm + cell_height_mm) + 0.5 * cell_height_mm + 0.25 * cell_height_mm - 1 * cell_height_mm) * mm  # на 1 клетку вниз
+
+            overlay_canvas.drawImage("company.png", x_52, y_52,
+                                   width=scaled_width*mm, height=scaled_height*mm,
                                    mask='auto', preserveAspectRatio=True)
-            
-            # Добавляем logo.png как в contratto
-            logo_img = Image.open("logo.png")
-            logo_width_mm = logo_img.width * 0.264583
-            logo_height_mm = logo_img.height * 0.264583
-            
-            logo_scaled_width = logo_width_mm / 9  # такое же масштабирование как в contratto
-            logo_scaled_height = logo_height_mm / 9
-            
-            # Используем клетку 71 как в contratto для logo.png
-            row_71 = (71 - 1) // 25
-            col_71 = (71 - 1) % 25
-            
-            x_71 = (col_71 - 2 + 4 - 2.0) * cell_width_mm * mm  # на 2.0 клетки влево как в contratto
-            y_71 = (297 - (row_71 * cell_height_mm + cell_height_mm) - 0.25 * cell_height_mm - 1 * cell_height_mm) * mm  # на 1 клетку вниз как в contratto
-            
-            overlay_canvas.drawImage("logo.png", x_71, y_71, 
-                                   width=logo_scaled_width*mm, height=logo_scaled_height*mm,
-                                   mask='auto', preserveAspectRatio=True)
-            
+
+            # Добавляем logo.png только для carta (как в contratto)
+            if template_name == 'carta':
+                logo_img = Image.open("logo.png")
+                logo_width_mm = logo_img.width * 0.264583
+                logo_height_mm = logo_img.height * 0.264583
+
+                logo_scaled_width = logo_width_mm / 9  # такое же масштабирование как в contratto
+                logo_scaled_height = logo_height_mm / 9
+
+                # Используем клетку 71 как в contratto для logo.png
+                row_71 = (71 - 1) // 25
+                col_71 = (71 - 1) % 25
+
+                x_71 = (col_71 - 2 + 4 - 2.0) * cell_width_mm * mm  # на 2.0 клетки влево как в contratto
+                y_71 = (297 - (row_71 * cell_height_mm + cell_height_mm) - 0.25 * cell_height_mm - 1 * cell_height_mm) * mm  # на 1 клетку вниз как в contratto
+
+                overlay_canvas.drawImage("logo.png", x_71, y_71,
+                                       width=logo_scaled_width*mm, height=logo_scaled_height*mm,
+                                       mask='auto', preserveAspectRatio=True)
+
             # Добавляем seal.png в центр 590-й клетки
             seal_img = Image.open("seal.png")
             seal_width_mm = seal_img.width * 0.264583
             seal_height_mm = seal_img.height * 0.264583
-            
+
             seal_scaled_width = seal_width_mm / 5
             seal_scaled_height = seal_height_mm / 5
-            
+
             row_590 = (590 - 1) // 25
             col_590 = (590 - 1) % 25
-            
+
             x_590_center = (col_590 + 0.5) * cell_width_mm * mm
             y_590_center = (297 - (row_590 + 0.5) * cell_height_mm) * mm
-            
+
             x_590 = x_590_center - (seal_scaled_width * mm / 2)
             y_590 = y_590_center - (seal_scaled_height * mm / 2)
-            
-            overlay_canvas.drawImage("seal.png", x_590, y_590, 
+
+            overlay_canvas.drawImage("seal.png", x_590, y_590,
                                    width=seal_scaled_width*mm, height=seal_scaled_height*mm,
                                    mask='auto', preserveAspectRatio=True)
-            
+
             # Добавляем sing_1.png в центр 593-й клетки
             sing1_img = Image.open("sing_1.png")
             sing1_width_mm = sing1_img.width * 0.264583
             sing1_height_mm = sing1_img.height * 0.264583
-            
+
             sing1_scaled_width = sing1_width_mm / 5
             sing1_scaled_height = sing1_height_mm / 5
-            
+
             row_593 = (593 - 1) // 25
             col_593 = (593 - 1) % 25
-            
+
             x_593_center = (col_593 + 0.5) * cell_width_mm * mm
             y_593_center = (297 - (row_593 + 0.5) * cell_height_mm) * mm
-            
+
             x_593 = x_593_center - (sing1_scaled_width * mm / 2)
             y_593 = y_593_center - (sing1_scaled_height * mm / 2)
-            
-            overlay_canvas.drawImage("sing_1.png", x_593, y_593, 
+
+            overlay_canvas.drawImage("sing_1.png", x_593, y_593,
                                    width=sing1_scaled_width*mm, height=sing1_scaled_height*mm,
                                    mask='auto', preserveAspectRatio=True)
-            
+
             overlay_canvas.save()
-            print("🖼️ Добавлены изображения для carta через ReportLab API: company.png (как в contratto, увеличен на 30%, -1/2 клетки вниз), logo.png (как в contratto), seal.png, sing_1.png")
+            print(f"🖼️ Добавлены изображения для {template_name} через ReportLab API")
         
         elif template_name in ('contratto',):
             # Страница 1 - добавляем company.png и logo.png
@@ -553,7 +576,7 @@ def fix_html_layout(template_name='contratto'):
         return html
     
     # Добавляем CSS для правильной разметки (НЕ для garanzia - уже обработана выше)
-    elif template_name == 'carta':
+    elif template_name in ['carta', 'approvazione']:
         # Для carta - СТРОГО 1 СТРАНИЦА с компактной версткой
         css_fixes = """
     <style>
@@ -874,7 +897,7 @@ def fix_html_layout(template_name='contratto'):
     elif template_name == 'garanzia':
         # Для garanzia НЕ УДАЛЯЕМ НИЧЕГО - сохраняем исходную структуру
         print("✅ Для garanzia сохранена исходная HTML структура без изменений")
-    elif template_name == 'carta':
+    elif template_name in ['carta', 'approvazione']:
         # Убираем ВСЕ изображения из carta - они создают лишние страницы
         # Убираем логотип в начале
         logo_pattern = r'<p class="c12"><span style="overflow: hidden[^>]*><img alt="" src="images/image1\.png"[^>]*></span></p>'
@@ -1066,13 +1089,13 @@ def fix_html_layout(template_name='contratto'):
             z-index: 600;
         " />\n'''
     
-    # Добавляем сетку в body (для contratto и carta)
-    if template_name in ['contratto', 'carta']:
+    # Добавляем сетку в body (для contratto, carta и approvazione)
+    if template_name in ['contratto', 'carta', 'approvazione']:
         grid_overlay = generate_grid()
         if template_name in ('contratto',):
             html = html.replace('<body class="c22 doc-content">', f'<body class="c22 doc-content">\n{grid_overlay}')
-        elif template_name == 'carta':
-            # Для carta ищем правильный body тег
+        elif template_name in ['carta', 'approvazione']:
+            # Для carta и approvazione ищем правильный body тег
             html = html.replace('<body class="c9 doc-content">', f'<body class="c9 doc-content">\n{grid_overlay}')
         print("🔢 Добавлена сетка позиционирования 25x35")
         print("📋 Изображения будут добавлены через ReportLab поверх PDF")
@@ -1125,6 +1148,9 @@ def main():
         elif template == 'carta':
             buf = generate_carta_pdf(test_data)
             filename = f'test_carta.pdf'
+        elif template == 'approvazione':
+            buf = generate_approvazione_pdf(test_data)
+            filename = f'test_approvazione.pdf'
         else:
             print(f"❌ Неизвестный тип документа: {template}")
             return
