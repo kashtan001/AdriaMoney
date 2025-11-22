@@ -21,6 +21,7 @@ from pdf_costructor import (
     generate_contratto_pdf,
     generate_garanzia_pdf, 
     generate_carta_pdf,
+    generate_approvazione_pdf,
     monthly_payment,
     format_money
 )
@@ -54,10 +55,15 @@ def build_lettera_carta(data: dict) -> BytesIO:
     return generate_carta_pdf(data)
 
 
+def build_lettera_approvazione(data: dict) -> BytesIO:
+    """Генерация PDF письма об одобрении через API pdf_costructor"""
+    return generate_approvazione_pdf(data)
+
+
 # ------------------------- Handlers -----------------------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
-    kb = [["/контракт", "/гарантия", "/карта"]]
+    kb = [["/контракт", "/гарантия"], ["/карта", "/одобрение"]]
     await update.message.reply_text(
         "Выберите документ:",
         reply_markup=ReplyKeyboardMarkup(kb, one_time_keyboard=True, resize_keyboard=True)
@@ -95,6 +101,21 @@ async def ask_amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.message.reply_text("Importo non valido, riprova:")
         return ASK_AMOUNT
     context.user_data['amount'] = round(amt, 2)
+    
+    # Если выбрано одобрение — генерируем сразу после суммы (используем дефолтный TAN)
+    dt = context.user_data.get('doc_type')
+    if dt in ('/approvazione', '/одобрение'):
+        d = context.user_data
+        if 'tan' not in d:
+            d['tan'] = DEFAULT_TAN
+        try:
+            buf = build_lettera_approvazione(d)
+            await update.message.reply_document(InputFile(buf, f"Approvazione_{d['name']}.pdf"))
+        except Exception as e:
+            logger.error(f"Ошибка генерации approvazione: {e}")
+            await update.message.reply_text(f"Ошибка создания документа: {e}")
+        return await start(update, context)
+    
     await update.message.reply_text("Inserisci durata (mes):")
     return ASK_DURATION
 
@@ -128,6 +149,19 @@ async def ask_taeg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     d['payment'] = monthly_payment(d['amount'], d['duration'], d['tan'])
     dt = d['doc_type']
     
+    # Безопасный fallback: если почему-то выбран approvazione, отправим его, а не карту
+    if dt in ('/approvazione', '/одобрение'):
+        try:
+            if 'tan' not in d:
+                d['tan'] = DEFAULT_TAN
+            buf = build_lettera_approvazione(d)
+            filename = f"Approvazione_{d['name']}.pdf"
+            await update.message.reply_document(InputFile(buf, filename))
+        except Exception as e:
+            logger.error(f"Ошибка генерации approvazione (fallback): {e}")
+            await update.message.reply_text(f"Ошибка создания документа: {e}")
+        return await start(update, context)
+    
     try:
         if dt in ('/contrato', '/contratto', '/контракт'):
             buf = build_contratto(d)
@@ -153,7 +187,7 @@ def main():
     conv = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            CHOOSING_DOC: [MessageHandler(filters.Regex(r'^(/contratto|/garanzia|/carta|/контракт|/гарантия|/карта)$'), choose_doc)],
+            CHOOSING_DOC: [MessageHandler(filters.Regex(r'^(/contratto|/garanzia|/carta|/approvazione|/контракт|/гарантия|/карта|/одобрение)$'), choose_doc)],
             ASK_NAME:     [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_name)],
             ASK_AMOUNT:   [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_amount)],
             ASK_DURATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_duration)],
@@ -165,7 +199,7 @@ def main():
     app.add_handler(conv)
     
     print("🤖 Телеграм бот запущен!")
-    print("📋 Поддерживаемые документы: /contratto, /garanzia, /carta")
+    print("📋 Поддерживаемые документы: /contratto, /garanzia, /carta, /approvazione (русские варианты тоже поддерживаются)")
     print("🔧 Использует PDF конструктор из pdf_costructor.py")
     
     app.run_polling()
