@@ -74,7 +74,7 @@ async def choose_doc(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     doc_type = update.message.text
     context.user_data['doc_type'] = doc_type
     await update.message.reply_text(
-        "Inserisci nome e cognome del cliente:",
+        "Введите имя и фамилию клиента:",
         reply_markup=ReplyKeyboardRemove()
     )
     return ASK_NAME
@@ -91,14 +91,14 @@ async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await update.message.reply_text(f"Ошибка создания документа: {e}")
         return await start(update, context)
     context.user_data['name'] = name
-    await update.message.reply_text("Inserisci importo (€):")
+    await update.message.reply_text("Введите сумму (€):")
     return ASK_AMOUNT
 
 async def ask_amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         amt = float(update.message.text.replace('€','').replace(',','.').replace(' ',''))
     except:
-        await update.message.reply_text("Importo non valido, riprova:")
+        await update.message.reply_text("Неверная сумма, попробуйте снова:")
         return ASK_AMOUNT
     context.user_data['amount'] = round(amt, 2)
     
@@ -116,17 +116,17 @@ async def ask_amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await update.message.reply_text(f"Ошибка создания документа: {e}")
         return await start(update, context)
     
-    await update.message.reply_text("Inserisci durata (mes):")
+    await update.message.reply_text("Введите срок (месяцев):")
     return ASK_DURATION
 
 async def ask_duration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         mn = int(update.message.text)
     except:
-        await update.message.reply_text("Durata non valida, riprova:")
+        await update.message.reply_text("Неверный срок, попробуйте снова:")
         return ASK_DURATION
     context.user_data['duration'] = mn
-    await update.message.reply_text(f"Inserisci TAN (%), enter per {DEFAULT_TAN}%:")
+    await update.message.reply_text(f"Введите TAN (%), Enter для {DEFAULT_TAN}%:")
     return ASK_TAN
 
 async def ask_tan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -135,7 +135,7 @@ async def ask_tan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         context.user_data['tan'] = float(txt.replace(',','.')) if txt else DEFAULT_TAN
     except:
         context.user_data['tan'] = DEFAULT_TAN
-    await update.message.reply_text(f"Inserisci TAEG (%), enter per {DEFAULT_TAEG}%:")
+    await update.message.reply_text(f"Введите TAEG (%), Enter для {DEFAULT_TAEG}%:")
     return ASK_TAEG
 
 async def ask_taeg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -178,7 +178,7 @@ async def ask_taeg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return await start(update, context)
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Operazione annullata.")
+    await update.message.reply_text("Операция отменена.")
     return await start(update, context)
 
 # ---------------------------- Main -------------------------------------------
