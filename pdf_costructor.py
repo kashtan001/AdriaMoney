@@ -267,10 +267,10 @@ def _generate_pdf_with_images(html: str, template_name: str, data: dict) -> Byte
                 <table class="c18" style="width: 100%;">
                 <tr class="c7" style="background-color: #b7b7b7;">
                     <td class="c4" style="text-align: center;"><p class="c15"><span class="c6 c11">Mese</span></p></td>
-                    <td class="c4" style="text-align: center;"><p class="c15"><span class="c6 c11">Rata</span></p></td>
+                    <td class="c4" style="text-align: center;"><p class="c15"><span class="c6 c11">Pagamento</span></p></td>
                     <td class="c4" style="text-align: center;"><p class="c15"><span class="c6 c11">Interessi</span></p></td>
-                    <td class="c4" style="text-align: center;"><p class="c15"><span class="c6 c11">Capitale</span></p></td>
-                    <td class="c4" style="text-align: center;"><p class="c15"><span class="c6 c11">Residuo</span></p></td>
+                    <td class="c4" style="text-align: center;"><p class="c15"><span class="c6 c11">Importo del prestito</span></p></td>
+                    <td class="c4" style="text-align: center;"><p class="c15"><span class="c6 c11">Saldo residuo</span></p></td>
                 </tr>
                 """
                 
