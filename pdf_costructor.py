@@ -499,8 +499,8 @@ def _add_images_to_pdf(pdf_bytes: bytes, template_name: str) -> BytesIO:
             seal_scaled_width = seal_width_mm / 5
             seal_scaled_height = seal_height_mm / 5
 
-            row_767 = (767 - 1) // 25
-            col_767 = (767 - 1) % 25
+            row_767 = (775 - 1) // 25
+            col_767 = (775 - 1) % 25
 
             x_767_center = (col_767 + 0.5) * cell_width_mm * mm
             y_767_center = (297 - (row_767 + 0.5) * cell_height_mm) * mm
