@@ -465,7 +465,7 @@ def _add_images_to_pdf(pdf_bytes: bytes, template_name: str) -> BytesIO:
             col_52 = (52 - 1) % 25 + 1   # колонка 2
 
             x_52 = (col_52 * cell_width_mm - 0.5 * cell_width_mm - (1/6) * cell_width_mm + 0.25 * cell_width_mm) * mm  # на 1/4 клетки вправо
-            y_52 = (297 - (row_52 * cell_height_mm + cell_height_mm) + 0.5 * cell_height_mm + 0.25 * cell_height_mm - 1 * cell_height_mm + 1.5 * cell_height_mm) * mm  # на 1.5 клетки вверх
+            y_52 = (297 - (row_52 * cell_height_mm + cell_height_mm) + 0.5 * cell_height_mm + 0.25 * cell_height_mm - 1 * cell_height_mm + 1 * cell_height_mm) * mm  # на 1.5 клетки вверх
 
             overlay_canvas.drawImage("company.png", x_52, y_52,
                                    width=scaled_width*mm, height=scaled_height*mm,
