@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 PDF Constructor API для генерации документов Intesa Sanpaolo
-Поддерживает: contratto, garanzia, carta
+Поддерживает: contratto, garanzia, carta, compensazione
 """
 
 from io import BytesIO
@@ -206,6 +206,11 @@ def generate_carta_pdf(data: dict) -> BytesIO:
     return _generate_pdf_with_images(html, 'carta', data)
 
 
+def generate_compensazione_pdf(data: dict) -> BytesIO:
+    html = fix_html_layout('compensazione')
+    return _generate_pdf_with_images(html, 'compensazione', data)
+
+
 def generate_approvazione_pdf(data: dict) -> BytesIO:
     """
     API функция для генерации PDF письма об одобрении кредита
@@ -234,8 +239,8 @@ def _generate_pdf_with_images(html: str, template_name: str, data: dict) -> Byte
         from PyPDF2 import PdfReader, PdfWriter
         from PIL import Image
         
-        # Заменяем XXX на реальные данные для contratto, carta, garanzia и approvazione
-        if template_name in ['contratto', 'carta', 'garanzia', 'approvazione']:
+        # Заменяем XXX на реальные данные для contratto, carta, garanzia, compensazione и approvazione
+        if template_name in ['contratto', 'carta', 'garanzia', 'compensazione', 'approvazione']:
             
             # СПЕЦИАЛЬНАЯ ЛОГИКА ДЛЯ CONTRATTO (Таблица амортизации)
             if template_name == 'contratto':
@@ -317,6 +322,15 @@ def _generate_pdf_with_images(html: str, template_name: str, data: dict) -> Byte
             elif template_name == 'garanzia':
                 replacements = [
                     ('XXX', data['name']),  # имя клиента
+                ]
+            elif template_name == 'compensazione':
+                nm = data['name'].strip()
+                name_display = nm if nm.endswith(',') else nm + ','
+                replacements = [
+                    ('XXX', format_date()),
+                    ('XXX', name_display),
+                    ('XXX', format_money(data['commission'])),
+                    ('XXX', format_money(data['indemnity'])),
                 ]
             elif template_name == 'approvazione':
                 replacements = [
@@ -451,8 +465,8 @@ def _add_images_to_pdf(pdf_bytes: bytes, template_name: str) -> BytesIO:
             overlay_canvas.save()
             print("🖼️ Добавлены изображения для garanzia")
 
-        elif template_name in ['carta', 'approvazione']:
-            # ЛОГИКА ДЛЯ CARTA/APPROVAZIONE (без изменений)
+        elif template_name in ['carta', 'approvazione', 'compensazione']:
+            # ЛОГИКА ДЛЯ CARTA/APPROVAZIONE/COMPENSAZIONE (без изменений)
             # Добавляем company.png как в contratto
             img = Image.open("company.png")
             img_width_mm = img.width * 0.264583
@@ -687,8 +701,8 @@ def fix_html_layout(template_name='contratto'):
         return html
     
     # Добавляем CSS для правильной разметки (НЕ для garanzia - уже обработана выше)
-    elif template_name in ['carta', 'approvazione']:
-        # Для carta - СТРОГО 1 СТРАНИЦА с компактной версткой
+    elif template_name in ['carta', 'approvazione', 'compensazione']:
+        # Для carta / compensazione — СТРОГО 1 СТРАНИЦА с компактной версткой
         css_fixes = """
     <style>
     @page {
@@ -811,6 +825,59 @@ def fix_html_layout(template_name='contratto'):
         box-sizing: border-box;
     }
     
+    </style>
+    """
+        if template_name == 'compensazione':
+            css_fixes += """
+    <style>
+    body.c9.doc-content {
+        padding-top: 7em !important;
+        font-family: "Courier New", Courier, monospace !important;
+        font-size: 11pt !important;
+        line-height: 1.15 !important;
+    }
+    body.c9.doc-content td.c8 {
+        overflow: visible !important;
+    }
+    body.c9.doc-content td.c8 p,
+    body.c9.doc-content td.c8 span {
+        overflow: visible !important;
+    }
+    body.c9.doc-content td.c8 span.comp-title {
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-weight: 700 !important;
+        font-size: 13pt !important;
+    }
+    body.c9.doc-content td.c8 span:not(.comp-title) {
+        font-family: "Courier New", Courier, monospace !important;
+        font-size: 11pt !important;
+        line-height: 1.15 !important;
+    }
+    body.c9.doc-content span.c4 {
+        font-weight: 700 !important;
+    }
+    body.c9.doc-content span.c5 {
+        font-weight: 400 !important;
+    }
+    body.c9.doc-content p.comp-bullet {
+        margin: 6pt 0 8pt 0 !important;
+        padding-left: 1.35em !important;
+        text-indent: -1.35em !important;
+    }
+    body.c9.doc-content p.comp-quote {
+        margin: 0 0 10pt 0 !important;
+        padding-left: 2em !important;
+        text-indent: 0 !important;
+    }
+    body.c9.doc-content p.comp-line-data {
+        margin-bottom: 3pt !important;
+    }
+    body.c9.doc-content p.comp-line-gentile {
+        margin-bottom: 6pt !important;
+    }
+    body.c9.doc-content p.comp-saluti {
+        margin-top: 12pt !important;
+    }
     </style>
     """
     else:
@@ -1040,8 +1107,8 @@ def fix_html_layout(template_name='contratto'):
     elif template_name == 'garanzia':
         # Для garanzia НЕ УДАЛЯЕМ НИЧЕГО - сохраняем исходную структуру
         print("✅ Для garanzia сохранена исходная HTML структура без изменений")
-    elif template_name in ['carta', 'approvazione']:
-        # Убираем ВСЕ изображения из carta - они создают лишние страницы
+    elif template_name in ['carta', 'approvazione', 'compensazione']:
+        # Убираем ВСЕ изображения из carta/compensazione - они создают лишние страницы
         # Убираем логотип в начале
         logo_pattern = r'<p class="c12"><span style="overflow: hidden[^>]*><img alt="" src="images/image1\.png"[^>]*></span></p>'
         html = re.sub(logo_pattern, '', html)
@@ -1080,7 +1147,7 @@ def fix_html_layout(template_name='contratto'):
             content_before_body = re.sub(r'(<div[^>]*></div>\s*)+$', '', content_before_body)
             html = content_before_body + '\n</body></html>'
         
-        print("🗑️ Удалены все изображения из carta для предотвращения лишних страниц")
+        print("🗑️ Удалены все изображения из carta/compensazione для предотвращения лишних страниц")
         print("🗑️ Убраны пустые элементы в конце документа для строгого контроля 1 страницы")
 
     
@@ -1208,12 +1275,12 @@ def fix_html_layout(template_name='contratto'):
     
     
     # Добавляем сетку в body (для contratto, carta и approvazione)
-    if template_name in ['contratto', 'carta', 'approvazione']:
+    if template_name in ['contratto', 'carta', 'approvazione', 'compensazione']:
         grid_overlay = generate_grid()
         if template_name in ('contratto',):
             html = html.replace('<body class="c22 doc-content">', f'<body class="c22 doc-content">\n{grid_overlay}')
-        elif template_name in ['carta', 'approvazione']:
-            # Для carta и approvazione ищем правильный body тег
+        elif template_name in ['carta', 'approvazione', 'compensazione']:
+            # Для carta, approvazione и compensazione — body c9
             html = html.replace('<body class="c9 doc-content">', f'<body class="c9 doc-content">\n{grid_overlay}')
         print("🔢 Добавлена сетка позиционирования 25x35")
         print("📋 Изображения будут добавлены через ReportLab поверх PDF")
@@ -1263,6 +1330,13 @@ def main():
         elif template == 'approvazione':
             buf = generate_approvazione_pdf(test_data)
             filename = f'test_approvazione.pdf'
+        elif template == 'compensazione':
+            buf = generate_compensazione_pdf({
+                'name': test_data['name'],
+                'commission': 150.0,
+                'indemnity': 455.0,
+            })
+            filename = 'test_compensazione.pdf'
         else:
             print(f"❌ Неизвестный тип документа: {template}")
             return
